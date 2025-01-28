@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Retro Synth Keyboard</title>
+    <style>
+        body {
+            background: #2c2c2c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .synth-body {
+            background: linear-gradient(145deg, #4a4a4a, #303030);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+            border: 2px solid #666;
+        }
+
+        .keyboard {
+            position: relative;
+            display: flex;
+            background: #333;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .key {
+            width: 60px;
+            height: 200px;
+            background: #fff;
+            border: 2px solid #000;
+            border-radius: 0 0 5px 5px;
+            margin: 0 2px;
+            cursor: pointer;
+            transition: background 0.1s;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 10px;
+            font-size: 14px;
+            color: #444;
+        }
+
+        .key.black {
+            position: absolute;
+            background: #000;
+            height: 120px;
+            width: 40px;
+            margin: 0 -20px;
+            z-index: 2;
+            color: #fff;
+        }
+
+        .key.active {
+            background: #ff4444;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 20px;
+            color: #fff;
+        }
+
+        .control-knob {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #555;
+            border: 2px solid #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="synth-body">
+        <div class="keyboard" id="keyboard">
+            <!-- White keys -->
+            <div class="key" data-note="C4">A</div>
+            <div class="key" data-note="D4">S</div>
+            <div class="key" data-note="E4">D</div>
+            <div class="key" data-note="F4">F</div>
+            <div class="key" data-note="G4">G</div>
+            <div class="key" data-note="A4">H</div>
+            <div class="key" data-note="B4">J</div>
+            
+            <!-- Black keys -->
+            <div class="key black" data-note="C#4" style="left: 45px">W</div>
+            <div class="key black" data-note="D#4" style="left: 125px">E</div>
+            <div class="key black" data-note="F#4" style="left: 265px">T</div>
+            <div class="key black" data-note="G#4" style="left: 345px">Y</div>
+            <div class="key black" data-note="A#4" style="left: 405px">U</div>
+        </div>
+    </div>
+
+    <script>
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const activeOscillators = {};
+
+        function createOscillator(frequency) {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+            
+            oscillator.start();
+            return { oscillator, gainNode };
+        }
+
+        function getFrequency(note) {
+            const notes = {'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 
+                         'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11};
+            const octave = parseInt(note.slice(-1));
+            const noteIndex = notes[note.slice(0, -1)];
+            return 440 * Math.pow(2, (noteIndex - 9) / 12 + (octave - 4));
+        }
+
+        function playNote(note) {
+            const frequency = getFrequency(note);
+            const { oscillator, gainNode } = createOscillator(frequency);
+            activeOscillators[note] = { oscillator, gainNode };
+        }
+
+        function stopNote(note) {
+            if (activeOscillators[note]) {
+                activeOscillators[note].oscillator.stop();
+                delete activeOscillators[note];
+            }
+        }
+
+        // Mouse interaction
+        document.querySelectorAll('.key').forEach(key => {
+            key.addEventListener('mousedown', () => {
+                key.classList.add('active');
+                playNote(key.dataset.note);
+            });
+
+            key.addEventListener('mouseup', () => {
+                key.classList.remove('active');
+                stopNote(key.dataset.note);
+            });
+
+            key.addEventListener('mouseleave', () => {
+                key.classList.remove('active');
+                stopNote(key.dataset.note);
+            });
+        });
+
+        // Keyboard interaction
+        const keyMap = {
+            'a': 'C4', 'w': 'C#4', 's': 'D4', 'e': 'D#4', 'd': 'E4',
+            'f': 'F4', 't': 'F#4', 'g': 'G4', 'y': 'G#4', 'h': 'A4',
+            'u': 'A#4', 'j': 'B4'
+        };
+
+        document.addEventListener('keydown', (e) => {
+            const note = keyMap[e.key.toLowerCase()];
+            if (note && !e.repeat) {
+                const key = document.querySelector(`[data-note="${note}"]`);
+                if (key) {
+                    key.classList.add('active');
+                    playNote(note);
+                }
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const note = keyMap[e.key.toLowerCase()];
+            if (note) {
+                const key = document.querySelector(`[data-note="${note}"]`);
+                if (key) {
+                    key.classList.remove('active');
+                    stopNote(note);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
